@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attainment Sheet Generated - CO-PO Generator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .container {
+            max-width: 600px;
+            width: 100%;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            padding: 40px;
+            text-align: center;
+        }
+        
+        .success-icon {
+            font-size: 80px;
+            margin-bottom: 20px;
+        }
+        
+        h1 {
+            color: #28a745;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+        }
+        
+        .details {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: left;
+        }
+        
+        .details-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .details-row:last-child {
+            border-bottom: none;
+        }
+        
+        .details-label {
+            font-weight: 600;
+            color: #555;
+        }
+        
+        .details-value {
+            color: #333;
+        }
+        
+        .btn {
+            display: inline-block;
+            padding: 15px 40px;
+            font-size: 1.1em;
+            font-weight: 600;
+            text-align: center;
+            text-decoration: none;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin: 10px;
+        }
+        
+        .btn-success {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+        }
+        
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(40, 167, 69, 0.4);
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background: #5a6268;
+            transform: translateY(-2px);
+        }
+        
+        .actions {
+            margin-top: 30px;
+        }
+        
+        .file-info {
+            background: #e7f3ff;
+            border: 1px solid #b8daff;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 20px 0;
+            word-break: break-all;
+        }
+        
+        .file-info .filename {
+            font-family: monospace;
+            font-size: 0.9em;
+            color: #004085;
+        }
+        
+        footer {
+            text-align: center;
+            color: white;
+            opacity: 0.8;
+            margin-top: 20px;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <div class="success-icon">✅</div>
+            <h1>Attainment Sheet Generated!</h1>
+            <p class="subtitle">Your CO-PO attainment sheet has been successfully created.</p>
+            
+            <div class="details">
+                <div class="details-row">
+                    <span class="details-label">Course Code</span>
+                    <span class="details-value">{{ course_code }}</span>
+                </div>
+                <div class="details-row">
+                    <span class="details-label">Course Name</span>
+                    <span class="details-value">{{ course_name }}</span>
+                </div>
+                <div class="details-row">
+                    <span class="details-label">Regulation</span>
+                    <span class="details-value">{{ regulation }}</span>
+                </div>
+                <div class="details-row">
+                    <span class="details-label">Category</span>
+                    <span class="details-value">{{ category|capitalize }}</span>
+                </div>
+                <div class="details-row">
+                    <span class="details-label">Students Processed</span>
+                    <span class="details-value">{{ students_count }}</span>
+                </div>
+            </div>
+            
+            <div class="file-info">
+                <strong>Generated File:</strong><br>
+                <span class="filename">{{ filename }}</span>
+            </div>
+            
+            <div class="actions">
+                <a href="{{ url_for('download', filename=filename) }}" class="btn btn-success">
+                    📥 Download Attainment Sheet
+                </a>
+                <br>
+                <a href="{{ url_for('index') }}" class="btn btn-secondary">
+                    ← Generate Another
+                </a>
+            </div>
+        </div>
+        
+        <footer>
+            <p>CO-PO Attainment Sheet Generator | Anna University Standards</p>
+        </footer>
+    </div>
+</body>
+</html>
