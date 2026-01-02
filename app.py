@@ -155,8 +155,8 @@ def generate():
         course_name = course_info.get('course_name', 'Course')
         
         # Clean course name for filename
-        safe_course_name = "".join(c if c.isalnum() or c in (' ', '-', '_') else '' for c in course_name)
-        safe_course_name = safe_course_name[:50]  # Limit length
+        safe_course_name = "".join(c if c.isalnum() or c in ('-', '_') else '_' for c in course_name)
+        safe_course_name = safe_course_name[:50].strip('_')  # Limit length and trim underscores
         
         # Generate output filename
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -203,10 +203,12 @@ def generate():
         return redirect(url_for('index'))
 
 
-@app.route('/download/<filename>')
+@app.route('/download/<path:filename>')
 def download(filename):
     """Download generated attainment sheet"""
-    file_path = OUTPUT_FOLDER / secure_filename(filename)
+    # Don't use secure_filename here as it modifies spaces and special chars
+    # The filename is already sanitized during generation
+    file_path = OUTPUT_FOLDER / filename
     
     if not file_path.exists():
         flash('File not found. It may have been deleted.', 'error')
