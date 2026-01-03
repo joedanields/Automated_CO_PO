@@ -5,9 +5,10 @@ Handles reading/writing Excel files with formula preservation
 import openpyxl
 from openpyxl.utils import get_column_letter
 from pathlib import Path
-from typing import Dict, List, Any, Optional, Tuple
+from typing import Dict, List, Any, Optional, Tuple, Union
 from copy import copy
 import shutil
+from io import BytesIO
 from .template_mapper import TemplateMapper
 from .data_parser import DataParser
 
@@ -221,7 +222,7 @@ class ExcelHandler:
         regulation: str,
         category: str,
         dept_type: str,
-        eval_files: Dict[str, str],
+        eval_files: Dict[str, Union[str, BytesIO]],
         output_path: str,
         course_info: Dict[str, str] = None
     ) -> Dict[str, Any]:
@@ -232,7 +233,7 @@ class ExcelHandler:
             regulation: R17, R21, R24
             category: theory, analytical, lab, project
             dept_type: dept, s&h, default
-            eval_files: Dict mapping assessment type to file path
+            eval_files: Dict mapping assessment type to file path or BytesIO object
                         e.g., {'IA1': 'path/to/ia1.xlsx', 'IA2': 'path/to/ia2.xlsx', 'Model': 'path/to/model.xlsx'}
             output_path: Path for output file
             course_info: Optional course info to embed
@@ -251,9 +252,9 @@ class ExcelHandler:
             eval_data = {}
             merged_students = {}
             
-            for assessment_type, file_path in eval_files.items():
+            for assessment_type, file_source in eval_files.items():
                 # Extract student data
-                students = self.parser.extract_student_data(file_path)
+                students = self.parser.extract_student_data(file_source)
                 eval_data[assessment_type] = students
                 
                 # Merge student info

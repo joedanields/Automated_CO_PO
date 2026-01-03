@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import uuid
 from datetime import datetime
+from io import BytesIO
 
 from utils.template_mapper import TemplateMapper
 from utils.data_parser import DataParser
@@ -20,15 +21,12 @@ app.secret_key = os.environ.get('SECRET_KEY', 'co-po-attainment-secret-key-2026'
 
 # Configuration
 BASE_DIR = Path(__file__).parent
-UPLOAD_FOLDER = BASE_DIR / 'uploads'
 OUTPUT_FOLDER = BASE_DIR / 'outputs'
 ALLOWED_EXTENSIONS = {'xlsx', 'xls'}
 
 # Ensure directories exist
-UPLOAD_FOLDER.mkdir(exist_ok=True)
 OUTPUT_FOLDER.mkdir(exist_ok=True)
 
-app.config['UPLOAD_FOLDER'] = str(UPLOAD_FOLDER)
 app.config['OUTPUT_FOLDER'] = str(OUTPUT_FOLDER)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 
@@ -101,14 +99,9 @@ def generate():
         # Get required inputs for this category
         required_inputs = template_mapper.get_required_inputs(regulation, category)
         
-        # Create unique session folder for uploads
-        session_id = str(uuid.uuid4())[:8]
-        session_folder = UPLOAD_FOLDER / session_id
-        session_folder.mkdir(exist_ok=True)
-        
-        # Process uploaded files
+        # Process uploaded files in-memory
         eval_files = {}
-        uploaded_paths = []
+        file_objects = {}
         
         for input_type in required_inputs:
             file_key = f'file_{input_type.lower()}'
@@ -127,16 +120,15 @@ def generate():
                 flash(f'Invalid file type for {input_type}. Only .xlsx and .xls allowed.', 'error')
                 return redirect(url_for('index'))
             
-            # Save file
-            filename = secure_filename(f"{input_type}_{file.filename}")
-            file_path = session_folder / filename
-            file.save(str(file_path))
+            # Read file into memory
+            file_content = BytesIO(file.read())
+            file_content.name = file.filename  # Store original filename
             
-            eval_files[input_type] = str(file_path)
-            uploaded_paths.append(str(file_path))
+            eval_files[input_type] = file_content
+            file_objects[input_type] = file_content
         
         # Validate consistency
-        validation_result = validator.validate_all(uploaded_paths, regulation)
+        validation_result = validator.validate_all(list(eval_files.values()), regulation)
         
         if not validation_result.is_valid:
             flash('Validation failed: ' + '; '.join(validation_result.errors), 'error')
@@ -177,17 +169,6 @@ def generate():
             flash(f'Generation failed: {result.get("error", "Unknown error")}', 'error')
             return redirect(url_for('index'))
         
-        # Cleanup session files
-        for path in uploaded_paths:
-            try:
-                Path(path).unlink()
-            except:
-                pass
-        try:
-            session_folder.rmdir()
-        except:
-            pass
-        
         flash(f'Successfully generated attainment sheet with {result["students_count"]} students!', 'success')
         
         return render_template('result.html', 
@@ -227,35 +208,20 @@ def api_validate():
     try:
         regulation = request.form.get('regulation', 'R17')
         
-        # Get all uploaded files
-        uploaded_paths = []
-        session_id = str(uuid.uuid4())[:8]
-        session_folder = UPLOAD_FOLDER / session_id
-        session_folder.mkdir(exist_ok=True)
+        # Get all uploaded files in-memory
+        file_objects = []
         
         for key, file in request.files.items():
             if file and allowed_file(file.filename):
-                filename = secure_filename(file.filename)
-                file_path = session_folder / filename
-                file.save(str(file_path))
-                uploaded_paths.append(str(file_path))
+                file_content = BytesIO(file.read())
+                file_content.name = file.filename
+                file_objects.append(file_content)
         
-        if not uploaded_paths:
+        if not file_objects:
             return jsonify({'valid': False, 'errors': ['No valid files uploaded']})
         
         # Validate
-        result = validator.validate_all(uploaded_paths, regulation)
-        
-        # Cleanup
-        for path in uploaded_paths:
-            try:
-                Path(path).unlink()
-            except:
-                pass
-        try:
-            session_folder.rmdir()
-        except:
-            pass
+        result = validator.validate_all(file_objects, regulation)
         
         return jsonify({
             'valid': result.is_valid,
@@ -282,7 +248,6 @@ def server_error(e):
 
 
 # Cleanup old files on startup
-cleanup_old_files(UPLOAD_FOLDER)
 cleanup_old_files(OUTPUT_FOLDER)
 
 
@@ -290,7 +255,6 @@ if __name__ == '__main__':
     print("=" * 60)
     print("CO-PO Attainment Sheet Generator")
     print("=" * 60)
-    print(f"Upload folder: {UPLOAD_FOLDER}")
     print(f"Output folder: {OUTPUT_FOLDER}")
     print(f"Available regulations: {template_mapper.get_available_regulations()}")
     print("=" * 60)

@@ -2,9 +2,10 @@
 Validator Module
 Validates consistency across multiple evaluation sheets
 """
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Union
 from dataclasses import dataclass
 from pathlib import Path
+from io import BytesIO
 from .data_parser import DataParser
 
 
@@ -42,20 +43,22 @@ class Validator:
         """Initialize Validator"""
         self.parser = DataParser()
     
-    def validate_file_exists(self, file_paths: List[str]) -> ValidationResult:
+    def validate_file_exists(self, file_sources: List[Union[str, BytesIO]]) -> ValidationResult:
         """
-        Validate that all files exist
+        Validate that all files exist (for file paths) or are valid (for BytesIO)
         
         Args:
-            file_paths: List of file paths to check
+            file_sources: List of file paths or BytesIO objects to check
             
         Returns:
             ValidationResult
         """
         errors = []
-        for path in file_paths:
-            if not Path(path).exists():
-                errors.append(f"File not found: {path}")
+        for source in file_sources:
+            if isinstance(source, str) and not Path(source).exists():
+                errors.append(f"File not found: {source}")
+            elif isinstance(source, BytesIO) and source.closed:
+                errors.append(f"BytesIO object is closed")
         
         return ValidationResult(
             is_valid=len(errors) == 0,
@@ -63,17 +66,17 @@ class Validator:
             warnings=[]
         )
     
-    def validate_consistency(self, file_paths: List[str]) -> ValidationResult:
+    def validate_consistency(self, file_sources: List[Union[str, BytesIO]]) -> ValidationResult:
         """
         Validate that all evaluation sheets have matching metadata
         
         Args:
-            file_paths: List of evaluation sheet file paths
+            file_sources: List of evaluation sheet file paths or BytesIO objects
             
         Returns:
             ValidationResult with validation status and any errors
         """
-        if not file_paths:
+        if not file_sources:
             return ValidationResult(
                 is_valid=False,
                 errors=["No files provided for validation"],
@@ -83,20 +86,25 @@ class Validator:
         errors = []
         warnings = []
         
-        # Check files exist
-        file_check = self.validate_file_exists(file_paths)
+        # Check files exist/valid
+        file_check = self.validate_file_exists(file_sources)
         if not file_check.is_valid:
             return file_check
         
         # Extract metadata from all files
         all_metadata = []
-        for path in file_paths:
+        for idx, source in enumerate(file_sources):
             try:
-                metadata = self.parser.extract_validation_fields(path)
-                metadata['file_path'] = path
+                metadata = self.parser.extract_validation_fields(source)
+                # Store identifier for error messages
+                if isinstance(source, BytesIO):
+                    metadata['file_identifier'] = getattr(source, 'name', f'File {idx+1}')
+                else:
+                    metadata['file_identifier'] = Path(source).name
                 all_metadata.append(metadata)
             except Exception as e:
-                errors.append(f"Error reading {path}: {str(e)}")
+                source_name = getattr(source, 'name', f'File {idx+1}') if isinstance(source, BytesIO) else source
+                errors.append(f"Error reading {source_name}: {str(e)}")
                 return ValidationResult(is_valid=False, errors=errors, warnings=[])
         
         # Compare required fields
@@ -109,8 +117,8 @@ class Validator:
                 if ref_value != cur_value:
                     errors.append(
                         f"Mismatch in '{field}': "
-                        f"'{reference[field]}' (in {Path(reference['file_path']).name}) vs "
-                        f"'{metadata[field]}' (in {Path(metadata['file_path']).name})"
+                        f"'{reference[field]}' (in {reference['file_identifier']}) vs "
+                        f"'{metadata[field]}' (in {metadata['file_identifier']})"
                     )
         
         # Check recommended fields (warnings only)
@@ -131,12 +139,12 @@ class Validator:
             warnings=warnings
         )
     
-    def validate_regulation(self, file_paths: List[str], expected_regulation: str) -> ValidationResult:
+    def validate_regulation(self, file_sources: List[Union[str, BytesIO]], expected_regulation: str) -> ValidationResult:
         """
         Validate that all files match the expected regulation
         
         Args:
-            file_paths: List of evaluation sheet file paths
+            file_sources: List of evaluation sheet file paths or BytesIO objects
             expected_regulation: Expected regulation (R17, R21, R24)
             
         Returns:
@@ -145,18 +153,20 @@ class Validator:
         errors = []
         expected_norm = self.parser.normalize_regulation(expected_regulation)
         
-        for path in file_paths:
+        for idx, source in enumerate(file_sources):
             try:
-                metadata = self.parser.extract_validation_fields(path)
+                metadata = self.parser.extract_validation_fields(source)
                 actual_reg = self.parser.normalize_regulation(metadata.get('regulation', ''))
                 
                 if actual_reg != expected_norm:
+                    source_name = getattr(source, 'name', f'File {idx+1}') if isinstance(source, BytesIO) else Path(source).name
                     errors.append(
-                        f"Regulation mismatch in {Path(path).name}: "
+                        f"Regulation mismatch in {source_name}: "
                         f"expected {expected_norm}, found {actual_reg}"
                     )
             except Exception as e:
-                errors.append(f"Error reading {path}: {str(e)}")
+                source_name = getattr(source, 'name', f'File {idx+1}') if isinstance(source, BytesIO) else source
+                errors.append(f"Error reading {source_name}: {str(e)}")
         
         return ValidationResult(
             is_valid=len(errors) == 0,
@@ -164,12 +174,12 @@ class Validator:
             warnings=[]
         )
     
-    def validate_student_match(self, file_paths: List[str]) -> ValidationResult:
+    def validate_student_match(self, file_sources: List[Union[str, BytesIO]]) -> ValidationResult:
         """
         Validate that same students appear across all evaluation sheets
         
         Args:
-            file_paths: List of evaluation sheet file paths
+            file_sources: List of evaluation sheet file paths or BytesIO objects
             
         Returns:
             ValidationResult with warnings for missing students
@@ -177,15 +187,17 @@ class Validator:
         warnings = []
         
         all_students = []
-        for path in file_paths:
+        for idx, source in enumerate(file_sources):
             try:
-                students = self.parser.extract_student_data(path)
+                students = self.parser.extract_student_data(source)
+                source_name = getattr(source, 'name', f'File {idx+1}') if isinstance(source, BytesIO) else Path(source).name
                 all_students.append({
-                    'file': Path(path).name,
+                    'file': source_name,
                     'reg_numbers': set(students.keys())
                 })
             except Exception as e:
-                warnings.append(f"Could not check students in {path}: {str(e)}")
+                source_name = getattr(source, 'name', f'File {idx+1}') if isinstance(source, BytesIO) else source
+                warnings.append(f"Could not check students in {source_name}: {str(e)}")
         
         if len(all_students) < 2:
             return ValidationResult(is_valid=True, errors=[], warnings=warnings)
@@ -212,12 +224,12 @@ class Validator:
             warnings=warnings
         )
     
-    def validate_marks_range(self, file_path: str) -> ValidationResult:
+    def validate_marks_range(self, file_source: Union[str, BytesIO]) -> ValidationResult:
         """
         Validate that marks are within valid limits (0 to max)
         
         Args:
-            file_path: Path to evaluation sheet
+            file_source: Path to evaluation sheet or BytesIO object
             
         Returns:
             ValidationResult
@@ -226,8 +238,8 @@ class Validator:
         warnings = []
         
         try:
-            max_marks = self.parser.extract_max_marks(file_path)
-            students = self.parser.extract_student_data(file_path)
+            max_marks = self.parser.extract_max_marks(file_source)
+            students = self.parser.extract_student_data(file_source)
             
             for reg_no, student in students.items():
                 for co_num, mark in student['co_marks'].items():
@@ -251,12 +263,12 @@ class Validator:
             warnings=warnings
         )
     
-    def validate_all(self, file_paths: List[str], expected_regulation: str = None) -> ValidationResult:
+    def validate_all(self, file_sources: List[Union[str, BytesIO]], expected_regulation: str = None) -> ValidationResult:
         """
         Run all validation checks
         
         Args:
-            file_paths: List of evaluation sheet file paths
+            file_sources: List of evaluation sheet file paths or BytesIO objects
             expected_regulation: Optional expected regulation
             
         Returns:
@@ -266,29 +278,29 @@ class Validator:
         all_warnings = []
         
         # File existence check
-        result = self.validate_file_exists(file_paths)
+        result = self.validate_file_exists(file_sources)
         all_errors.extend(result.errors)
         if not result.is_valid:
             return ValidationResult(is_valid=False, errors=all_errors, warnings=[])
         
         # Consistency check
-        result = self.validate_consistency(file_paths)
+        result = self.validate_consistency(file_sources)
         all_errors.extend(result.errors)
         all_warnings.extend(result.warnings)
         
         # Regulation check
         if expected_regulation:
-            result = self.validate_regulation(file_paths, expected_regulation)
+            result = self.validate_regulation(file_sources, expected_regulation)
             all_errors.extend(result.errors)
             all_warnings.extend(result.warnings)
         
         # Student match check
-        result = self.validate_student_match(file_paths)
+        result = self.validate_student_match(file_sources)
         all_warnings.extend(result.warnings)
         
         # Marks range check for each file
-        for path in file_paths:
-            result = self.validate_marks_range(path)
+        for source in file_sources:
+            result = self.validate_marks_range(source)
             all_errors.extend(result.errors)
             all_warnings.extend(result.warnings)
         

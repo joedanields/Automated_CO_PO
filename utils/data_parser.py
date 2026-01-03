@@ -5,7 +5,8 @@ Extracts marks and validation fields from evaluation sheets
 import openpyxl
 from openpyxl.utils import get_column_letter
 from pathlib import Path
-from typing import Dict, List, Any, Optional, Tuple
+from typing import Dict, List, Any, Optional, Tuple, Union
+from io import BytesIO
 import re
 
 
@@ -42,24 +43,27 @@ class DataParser:
         """Initialize DataParser"""
         pass
     
-    def load_workbook(self, file_path: str) -> openpyxl.Workbook:
+    def load_workbook(self, file_source: Union[str, BytesIO]) -> openpyxl.Workbook:
         """
-        Load Excel workbook
+        Load Excel workbook from file path or file-like object
         
         Args:
-            file_path: Path to Excel file
+            file_source: Path to Excel file or BytesIO object
             
         Returns:
             openpyxl Workbook object
         """
-        return openpyxl.load_workbook(file_path, data_only=True)
+        if isinstance(file_source, BytesIO):
+            file_source.seek(0)  # Reset file pointer to beginning
+            return openpyxl.load_workbook(file_source, data_only=True)
+        return openpyxl.load_workbook(file_source, data_only=True)
     
-    def extract_validation_fields(self, file_path: str) -> Dict[str, str]:
+    def extract_validation_fields(self, file_source: Union[str, BytesIO]) -> Dict[str, str]:
         """
         Extract metadata/validation fields from evaluation sheet
         
         Args:
-            file_path: Path to evaluation sheet
+            file_source: Path to evaluation sheet or BytesIO object
             
         Returns:
             Dictionary with validation fields:
@@ -74,7 +78,7 @@ class DataParser:
                 'assessment_name': 'INTERNAL ASSESSMENT-1'
             }
         """
-        wb = self.load_workbook(file_path)
+        wb = self.load_workbook(file_source)
         ws = wb.active
         
         fields = {}
@@ -164,12 +168,12 @@ class DataParser:
         
         return co_columns
     
-    def extract_student_data(self, file_path: str) -> Dict[str, Dict]:
+    def extract_student_data(self, file_source: Union[str, BytesIO]) -> Dict[str, Dict]:
         """
         Extract student marks from evaluation sheet
         
         Args:
-            file_path: Path to evaluation sheet
+            file_source: Path to evaluation sheet or BytesIO object
             
         Returns:
             Dictionary with student data:
@@ -183,7 +187,7 @@ class DataParser:
                 ...
             }
         """
-        wb = self.load_workbook(file_path)
+        wb = self.load_workbook(file_source)
         ws = wb.active
         
         # Find CO columns
@@ -238,12 +242,12 @@ class DataParser:
         wb.close()
         return students
     
-    def extract_max_marks(self, file_path: str) -> Dict[str, Any]:
+    def extract_max_marks(self, file_source: Union[str, BytesIO]) -> Dict[str, Any]:
         """
         Extract maximum marks for each CO from evaluation sheet
         
         Args:
-            file_path: Path to evaluation sheet
+            file_source: Path to evaluation sheet or BytesIO object
             
         Returns:
             Dictionary with max marks:
@@ -252,7 +256,7 @@ class DataParser:
                 'total_max': 50
             }
         """
-        wb = self.load_workbook(file_path)
+        wb = self.load_workbook(file_source)
         ws = wb.active
         
         co_columns = self.find_co_columns(ws)

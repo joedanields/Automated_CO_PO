@@ -297,8 +297,10 @@ All uploaded evaluation sheets **must match** on these fields:
 | Web Framework | **Flask** | File upload interface, routing |
 | Excel Handling | **openpyxl** | Read/write Excel with formula preservation |
 | Data Processing | **pandas** | Parse CSV, data manipulation |
-| File Storage | **Local Filesystem** | Store templates, uploads, outputs |
+| File Processing | **In-Memory (BytesIO)** | Process uploads without disk storage |
 | Frontend | **HTML/CSS/JavaScript** | User interface |
+
+**🔒 Security Feature**: Uploaded files are processed entirely in-memory using Python's `BytesIO` objects. No files are ever saved to disk, providing better security and eliminating the need for cleanup routines.
 
 ### Core Modules
 
