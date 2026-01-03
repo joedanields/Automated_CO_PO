@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 50" width="120" height="50">
+  <defs>
+    <linearGradient id="pygrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3776ab;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#ffd43b;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <rect width="120" height="50" rx="10" fill="#1e293b"/>
+  <text x="10" y="32" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#ffd43b">Py</text>
+  <text x="40" y="32" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="white">Expo</text>
+  <circle cx="105" cy="25" r="12" fill="url(#pygrad)"/>
+  <text x="105" y="30" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="white" text-anchor="middle">🐍</text>
+</svg>
